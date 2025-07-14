@@ -1774,14 +1774,12 @@ def stage_exit_post():
 
     # --- Summary Row ---
     col1, col2 = st.columns([2, 1])
-
     with col1:
         st.markdown(f"**Session completed:** {completed}/3 lessons<br>**Duration:** {duration}", unsafe_allow_html=True)
-
     with col2:
         st.markdown(f"**User:** {st.session_state.user_name}", unsafe_allow_html=True)
 
-    # --- Optional Final Note (Condensed) ---
+    # --- Completion Note ---
     if completed == 3:
         st.success("🏆 You completed all lessons! Well done!")
     elif completed > 0:
@@ -1789,7 +1787,7 @@ def stage_exit_post():
     else:
         st.warning("No lessons completed. Try again for a full experience!")
 
-    # --- CUQ Survey Before Exit ---
+    # --- CUQ Survey ---
     st.markdown("---")
     st.markdown('<div style="font-size:1.6em;font-weight:600;margin-bottom:2px;">📝 Chatbot Usability & Quality (CUQ) Survey</div>', unsafe_allow_html=True)
     st.markdown("Please rate your experience with Layantara Insight. Your feedback helps us improve!")
@@ -1805,42 +1803,47 @@ def stage_exit_post():
     ]
 
     cuq_responses = []
-    for i, q in enumerate(cuq_questions, 1):
-        cuq_responses.append(
-            st.slider(q, min_value=1, max_value=5, value=3, key=f"cuq_{i}")
-        )
+    for i, question in enumerate(cuq_questions, 1):
+        response = st.slider(question, 1, 5, 3, key=f"cuq_{i}")
+        cuq_responses.append(response)
 
-    # --- New: Optional Text Feedback (CUQ Q8)
-    cuq_text_feedback = st.text_area("8. Please share any additional thoughts or suggestions about the chatbot experience (optional):", "")
+    # --- Optional Open Text Feedback (CUQ Q8) ---
+    cuq_text_feedback = st.text_area(
+        "8. Please share any additional thoughts or suggestions about the chatbot experience (optional):", 
+        placeholder="Type your feedback here..."
+    )
 
+    # --- Submit CUQ ---
     if st.button("Submit CUQ", type="primary", use_container_width=True):
-        # --- Google Sheets Upload ---
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
         from datetime import datetime
 
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = dict(st.secrets["google_sheets"])
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        gc = gspread.authorize(credentials)
-        sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
-        sheet = gc.open(sheet_name).sheet1
+        try:
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds_dict = dict(st.secrets["google_sheets"])
+            credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            gc = gspread.authorize(credentials)
+            sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
+            sheet = gc.open(sheet_name).sheet1
 
-        # Append the new row with text feedback
-        row = [
-            st.session_state.user_name,
-            str(datetime.now()),
-            completed,
-            duration,
-            *cuq_responses,
-            cuq_text_feedback
-        ]
-        sheet.append_row(row)
-        st.success("Thank you! Your feedback has been submitted.")
+            row = [
+                st.session_state.user_name,
+                str(datetime.now()),
+                completed,
+                duration,
+                *cuq_responses,
+                cuq_text_feedback
+            ]
+            sheet.append_row(row)
+            st.success("Thank you! Your feedback has been submitted.")
+        except Exception as e:
+            st.error("❌ Failed to submit feedback.")
+            st.exception(e)
 
     st.markdown("<div style='font-size:1.1em;color:#666;margin:12px 0;'>Please submit the survey to complete your session.</div>", unsafe_allow_html=True)
 
-    # --- Restart Button ---
+    # --- Restart ---
     st.markdown("---")
     if st.button("🔄 Start a New Session", type="primary", use_container_width=True):
         st.session_state.stage = "greeting"
