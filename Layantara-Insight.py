@@ -1816,7 +1816,7 @@ def stage_exit_post():
         creds_dict = dict(st.secrets["google_sheets"])
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         gc = gspread.authorize(credentials)
-        sheet_name = st.secrets.get("sheet_name", "Layantara CUQ Survey")
+        sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
         sheet = gc.open(sheet_name).sheet1
         row = [
             st.session_state.user_name,
