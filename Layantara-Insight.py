@@ -1814,19 +1814,15 @@ def stage_exit_post():
 
         # Use Streamlit secrets for credentials
         import streamlit as st
-        import json
-
-        # Load credentials from Streamlit secrets
-        creds_dict = st.secrets["gcp_service_account"]
-        creds_json = json.dumps(dict(creds_dict))
+        # --- Google Sheets Upload (Streamlit Cloud only) ---
+        import gspread
+        from oauth2client.service_account import ServiceAccountCredentials
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(creds_json), scope)
+        creds_dict = dict(st.secrets["google_sheets"])
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         gc = gspread.authorize(credentials)
-
-        # Open the Google Sheet (replace with your sheet name)
-        sheet = gc.open("Layantara CUQ Survey").sheet1
-
-        # Prepare row data
+        sheet_name = st.secrets.get("sheet_name", "Layantara CUQ Survey")
+        sheet = gc.open(sheet_name).sheet1
         row = [
             st.session_state.user_name,
             str(datetime.now()),
