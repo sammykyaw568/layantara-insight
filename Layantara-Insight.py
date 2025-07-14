@@ -9,14 +9,15 @@ def save_to_google_sheets(cuq_responses):
     """
     # Google Sheets API scope
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("Layantara_CUQ_Results").sheet1
-        sheet.append_row(cuq_responses)
-    except Exception as e:
-        st.error("❌ Failed to save CUQ data to Google Sheets.")
-        st.exception(e)
+    # Load credentials from secrets.toml
+    creds_dict = st.secrets["google_sheets"]
+    creds_json = json.dumps(dict(creds_dict))
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(creds_json), scope)
+
+    gc = gspread.authorize(credentials)
+    sheet = gc.open("Layantara_CUQ_Results").sheet1
+    sheet.append_row(cuq_responses)
+
 import streamlit as st
 QUIZ_BANK = {
     "Angles": [
