@@ -4,19 +4,34 @@ import random
 
 def save_to_google_sheets(cuq_responses):
     """
-    Saves a list of 7 CUQ responses to a predefined Google Sheet.
-    CUQ responses must be in a 1D list of integers (Likert scale 1–5).
+    Saves CUQ data to a Google Sheet using credentials from secrets.toml or local JSON.
+    Accepts a list with metadata and 7 CUQ Likert-scale values.
     """
-    # Google Sheets API scope
+    import streamlit as st
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+        if "google_sheets" in st.secrets:
+            # Use Streamlit secrets (for cloud deployment)
+            creds_dict = dict(st.secrets["google_sheets"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
+        else:
+            # Fallback to local JSON for local development
+            creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+            sheet_name = "Layantara_CUQ_Results"
+
         client = gspread.authorize(creds)
-        sheet = client.open("Layantara_CUQ_Results").sheet1
+        sheet = client.open(sheet_name).sheet1
         sheet.append_row(cuq_responses)
+
     except Exception as e:
         st.error("❌ Failed to save CUQ data to Google Sheets.")
         st.exception(e)
+
 import streamlit as st
 QUIZ_BANK = {
     "Angles": [
@@ -1742,6 +1757,7 @@ def stage_exit_early():
     st.write(f"No problem at all, {st.session_state.user_name}! Come back anytime.")
 
 def stage_exit_post():
+    from datetime import datetime
     update_lesson_completion()
     completed = sum(st.session_state.lesson_done.values())
     duration = get_session_duration()
@@ -1773,10 +1789,8 @@ def stage_exit_post():
 
     # --- Summary Row ---
     col1, col2 = st.columns([2, 1])
-
     with col1:
         st.markdown(f"**Session completed:** {completed}/3 lessons<br>**Duration:** {duration}", unsafe_allow_html=True)
-
     with col2:
         st.markdown(f"**User:** {st.session_state.user_name}", unsafe_allow_html=True)
 
@@ -1792,6 +1806,7 @@ def stage_exit_post():
     st.markdown("---")
     st.markdown('<div style="font-size:1.6em;font-weight:600;margin-bottom:2px;">📝 Chatbot Usability & Quality (CUQ) Survey</div>', unsafe_allow_html=True)
     st.markdown("Please rate your experience with Layantara Insight. Your feedback helps us improve!")
+
     cuq_questions = [
         "1. The chatbot explained math problems clearly with logical steps and accurate reasoning.",
         "2. The quiz questions reinforced my understanding through kite-related examples.",
@@ -1808,25 +1823,7 @@ def stage_exit_post():
         )
 
     if st.button("Submit CUQ", type="primary", use_container_width=True):
-        # --- Google Sheets Upload ---
-        import gspread
-        from oauth2client.service_account import ServiceAccountCredentials
-
-        # Use Streamlit secrets for credentials
-        import streamlit as st
-        import json
-
-        # Load credentials from Streamlit secrets
-        creds_dict = st.secrets["gcp_service_account"]
-        creds_json = json.dumps(dict(creds_dict))
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(creds_json), scope)
-        gc = gspread.authorize(credentials)
-
-        # Open the Google Sheet (replace with your sheet name)
-        sheet = gc.open("Layantara CUQ Survey").sheet1
-
-        # Prepare row data
+        # --- Use centralized function to save CUQ data to Google Sheets ---
         row = [
             st.session_state.user_name,
             str(datetime.now()),
@@ -1834,15 +1831,17 @@ def stage_exit_post():
             duration,
             *cuq_responses
         ]
-        sheet.append_row(row)
-        st.success("Thank you! Your feedback has been submitted.")
+        save_to_google_sheets(row)
+        st.success("✅ Thank you! Your feedback has been submitted.")
 
     st.markdown("<div style='font-size:1.1em;color:#666;margin:12px 0;'>Please submit the survey to complete your session.</div>", unsafe_allow_html=True)
+
     # --- Restart Button ---
     st.markdown("---")
     if st.button("🔄 Start a New Session", type="primary", use_container_width=True):
         st.session_state.stage = "greeting"
         st.rerun()
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # STAGE — AI Kite Explorer
