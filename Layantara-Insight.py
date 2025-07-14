@@ -1793,6 +1793,7 @@ def stage_exit_post():
     st.markdown("---")
     st.markdown('<div style="font-size:1.6em;font-weight:600;margin-bottom:2px;">📝 Chatbot Usability & Quality (CUQ) Survey</div>', unsafe_allow_html=True)
     st.markdown("Please rate your experience with Layantara Insight. Your feedback helps us improve!")
+
     cuq_questions = [
         "1. The chatbot explained math problems clearly with logical steps and accurate reasoning.",
         "2. The quiz questions reinforced my understanding through kite-related examples.",
@@ -1802,38 +1803,49 @@ def stage_exit_post():
         "6. The chatbot maintained a consistent, professional, tutor-like tone.",
         "7. Post-question feedback was helpful for learning."
     ]
+
     cuq_responses = []
     for i, q in enumerate(cuq_questions, 1):
         cuq_responses.append(
             st.slider(q, min_value=1, max_value=5, value=3, key=f"cuq_{i}")
         )
 
+    # --- New: Optional Text Feedback (CUQ Q8)
+    cuq_text_feedback = st.text_area("8. Please share any additional thoughts or suggestions about the chatbot experience (optional):", "")
+
     if st.button("Submit CUQ", type="primary", use_container_width=True):
         # --- Google Sheets Upload ---
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
+        from datetime import datetime
+
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds_dict = dict(st.secrets["google_sheets"])
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         gc = gspread.authorize(credentials)
         sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
         sheet = gc.open(sheet_name).sheet1
+
+        # Append the new row with text feedback
         row = [
             st.session_state.user_name,
             str(datetime.now()),
             completed,
             duration,
-            *cuq_responses
+            *cuq_responses,
+            cuq_text_feedback
         ]
         sheet.append_row(row)
         st.success("Thank you! Your feedback has been submitted.")
 
     st.markdown("<div style='font-size:1.1em;color:#666;margin:12px 0;'>Please submit the survey to complete your session.</div>", unsafe_allow_html=True)
+
     # --- Restart Button ---
     st.markdown("---")
     if st.button("🔄 Start a New Session", type="primary", use_container_width=True):
         st.session_state.stage = "greeting"
         st.rerun()
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # STAGE — AI Kite Explorer
