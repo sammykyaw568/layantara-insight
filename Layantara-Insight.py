@@ -9,15 +9,14 @@ def save_to_google_sheets(cuq_responses):
     """
     # Google Sheets API scope
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Load credentials from secrets.toml
-    creds_dict = st.secrets["google_sheets"]
-    creds_json = json.dumps(dict(creds_dict))
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(creds_json), scope)
-
-    gc = gspread.authorize(credentials)
-    sheet = gc.open("Layantara_CUQ_Results").sheet1
-    sheet.append_row(cuq_responses)
-
+    try:
+        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+        client = gspread.authorize(creds)
+        sheet = client.open("Layantara_CUQ_Results").sheet1
+        sheet.append_row(cuq_responses)
+    except Exception as e:
+        st.error("❌ Failed to save CUQ data to Google Sheets.")
+        st.exception(e)
 import streamlit as st
 QUIZ_BANK = {
     "Angles": [
@@ -1077,8 +1076,8 @@ def layantara_banner():
     /* Add a real spacer div after the banner to push content down, instead of relying on padding */
     .layantara-banner-spacer {
         width: 100vw;
-        min-height: 120px;
-        height: 120px;
+        min-height: 85px;
+        height: 85px;
         display: block;
         pointer-events: none;
     }
@@ -1362,6 +1361,11 @@ def stage_greeting():
 # STAGE 2 — Ask name (auto advance on ENTER)
 def stage_ask_name():
     st.markdown("""
+    <style>
+    .ask-name-padding-top {
+        height: 48px;
+    }
+    </style>
     <div class='ask-name-padding-top'></div>
     """, unsafe_allow_html=True)
     st.markdown("""
@@ -1388,9 +1392,12 @@ def stage_ask_name():
 
 # STAGE 3 — Show image + intro
 def stage_name_captured():
-    # Custom CSS specifically for name_captured page to eliminate gaps
+    # Add top padding for name captured page
     st.markdown("""
     <style>
+    .name-captured-padding-top {
+        height: 48px;
+    }
     /* Override Streamlit column spacing aggressively for name_captured page */
     .stColumns {
         gap: 10px !important;
@@ -1474,6 +1481,7 @@ def stage_name_captured():
         }
     }
     </style>
+    <div class='name-captured-padding-top'></div>
     """, unsafe_allow_html=True)
     
     # Move the greeting text upwards with reduced top margin
@@ -1527,6 +1535,15 @@ def stage_name_captured():
 
 # STAGE 4 — Menu with enhanced navigation
 def stage_menu():
+    # Add top padding for menu page
+    st.markdown("""
+    <style>
+    .menu-padding-top {
+        height: 48px;
+    }
+    </style>
+    <div class='menu-padding-top'></div>
+    """, unsafe_allow_html=True)
     # Update completion stats
     update_lesson_completion()
     
@@ -1774,12 +1791,14 @@ def stage_exit_post():
 
     # --- Summary Row ---
     col1, col2 = st.columns([2, 1])
+
     with col1:
         st.markdown(f"**Session completed:** {completed}/3 lessons<br>**Duration:** {duration}", unsafe_allow_html=True)
+
     with col2:
         st.markdown(f"**User:** {st.session_state.user_name}", unsafe_allow_html=True)
 
-    # --- Completion Note ---
+    # --- Optional Final Note (Condensed) ---
     if completed == 3:
         st.success("🏆 You completed all lessons! Well done!")
     elif completed > 0:
@@ -1787,11 +1806,10 @@ def stage_exit_post():
     else:
         st.warning("No lessons completed. Try again for a full experience!")
 
-    # --- CUQ Survey ---
+    # --- CUQ Survey Before Exit ---
     st.markdown("---")
     st.markdown('<div style="font-size:1.6em;font-weight:600;margin-bottom:2px;">📝 Chatbot Usability & Quality (CUQ) Survey</div>', unsafe_allow_html=True)
     st.markdown("Please rate your experience with Layantara Insight. Your feedback helps us improve!")
-
     cuq_questions = [
         "1. The chatbot explained math problems clearly with logical steps and accurate reasoning.",
         "2. The quiz questions reinforced my understanding through kite-related examples.",
@@ -1801,54 +1819,38 @@ def stage_exit_post():
         "6. The chatbot maintained a consistent, professional, tutor-like tone.",
         "7. Post-question feedback was helpful for learning."
     ]
-
     cuq_responses = []
-    for i, question in enumerate(cuq_questions, 1):
-        response = st.slider(question, 1, 5, 3, key=f"cuq_{i}")
-        cuq_responses.append(response)
+    for i, q in enumerate(cuq_questions, 1):
+        cuq_responses.append(
+            st.slider(q, min_value=1, max_value=5, value=3, key=f"cuq_{i}")
+        )
 
-    # --- Optional Open Text Feedback (CUQ Q8) ---
-    cuq_text_feedback = st.text_area(
-        "8. Please share any additional thoughts or suggestions about the chatbot experience (optional):", 
-        placeholder="Type your feedback here..."
-    )
-
-    # --- Submit CUQ ---
     if st.button("Submit CUQ", type="primary", use_container_width=True):
+        # --- Google Sheets Upload ---
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
-        from datetime import datetime
-
-        try:
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds_dict = dict(st.secrets["google_sheets"])
-            credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-            gc = gspread.authorize(credentials)
-            sheet_name = st.secrets.get("sheet_name", "Layantara_CUQ_Results")
-            sheet = gc.open(sheet_name).sheet1
-
-            row = [
-                st.session_state.user_name,
-                str(datetime.now()),
-                completed,
-                duration,
-                *cuq_responses,
-                cuq_text_feedback
-            ]
-            sheet.append_row(row)
-            st.success("Thank you! Your feedback has been submitted.")
-        except Exception as e:
-            st.error("❌ Failed to submit feedback.")
-            st.exception(e)
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = dict(st.secrets["google_sheets"])
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        gc = gspread.authorize(credentials)
+        sheet_name = st.secrets.get("sheet_name", "Layantara CUQ Survey")
+        sheet = gc.open(sheet_name).sheet1
+        row = [
+            st.session_state.user_name,
+            str(datetime.now()),
+            completed,
+            duration,
+            *cuq_responses
+        ]
+        sheet.append_row(row)
+        st.success("Thank you! Your feedback has been submitted.")
 
     st.markdown("<div style='font-size:1.1em;color:#666;margin:12px 0;'>Please submit the survey to complete your session.</div>", unsafe_allow_html=True)
-
-    # --- Restart ---
+    # --- Restart Button ---
     st.markdown("---")
     if st.button("🔄 Start a New Session", type="primary", use_container_width=True):
         st.session_state.stage = "greeting"
         st.rerun()
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 # STAGE — AI Kite Explorer
@@ -1860,6 +1862,17 @@ def stage_ai_chat():
         st.session_state.chat_history = []
 
     # Chat mode suggestion buttons
+    # Decrease all default Streamlit button sizes on the AI chat page
+    st.markdown("""
+    <style>
+    .stButton > button {
+        font-size: 0.93em !important;
+        padding: 0.38em 1.1em !important;
+        border-radius: 8px !important;
+        min-width: 80px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     st.markdown("""
     <div class="welcome">
         <div class="emoji">🪁</div>
@@ -1955,12 +1968,22 @@ def stage_ai_explorer():
         background: radial-gradient(ellipse at 60% 10%, #00d4ff33 0%, #0f172a 60%) no-repeat fixed;
         color: #f1f5f9;
     }
+    /* Remove gap below Layantara Insight banner and above .header */
+    section.main > div.block-container:first-child {
+        margin-top: 0rem !important;
+        padding-top: 0rem !important;
+    }
+    .layantara-banner, .layantara-banner * {
+        margin-bottom: 0rem !important;
+        padding-bottom: 0rem !important;
+    }
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 0.7rem;
-        margin-bottom: 1.7rem;
+        margin-top: 0.2rem;
+        margin-bottom: 1rem;
         background: none;
     }
     .header .stButton > button {
@@ -1993,8 +2016,10 @@ def stage_ai_explorer():
     }
     .welcome {
         text-align: center;
-        padding-top: 2.7rem;
-        padding-bottom: 1.7rem;
+        margin-top: 2.2rem;
+        margin-bottom: 1.1rem;
+        padding-top: 0;
+        padding-bottom: 0;
         color: #e0e7ef;
         animation: fadeInWelcome 1.2s cubic-bezier(.6,2,.6,1);
     }
@@ -2003,7 +2028,7 @@ def stage_ai_explorer():
         to { opacity: 1; transform: none; }
     }
     .welcome .emoji {
-        font-size: 3.7rem;
+        font-size: 2.7rem;
         margin-bottom: 0.2rem;
         filter: drop-shadow(0 2px 16px #00d4ff77);
         animation: floatEmoji 2.5s infinite ease-in-out alternate;
@@ -2013,7 +2038,7 @@ def stage_ai_explorer():
         to { transform: translateY(-12px) scale(1.08); }
     }
     .welcome .title {
-        font-size: 1.7rem;
+        font-size: 1.4rem;
         font-weight: 900;
         margin-top: 0.5rem;
         letter-spacing: 0.01em;
@@ -2037,7 +2062,7 @@ def stage_ai_explorer():
         flex-wrap: wrap;
         gap: 1.1rem;
         justify-content: center;
-        margin: 2.2rem 0 1.7rem 0;
+        margin: 0.2rem 0 1.7rem 0;
         animation: fadeInSuggestions 1.3s cubic-bezier(.6,2,.6,1);
     }
     @keyframes fadeInSuggestions {
@@ -2351,8 +2376,8 @@ def stage_ai_explorer():
 
         # Show suggestion buttons only before any message is sent
         if not st.session_state.ai_conversation_started and not st.session_state.chat_messages:
-            # Move suggestion row upwards by reducing margin-top
-            st.markdown('<style>.suggestion-row { margin-top: 0.2rem !important; }</style>', unsafe_allow_html=True)
+            # Move suggestion row upwards by reducing all margins
+            st.markdown('<style>.suggestion-row { margin: 0.2rem 0 1.7rem 0 !important; }</style>', unsafe_allow_html=True)
             st.markdown('<div class="suggestion-row">', unsafe_allow_html=True)
             suggestions = [
                 "Layangan Janggan kite",
@@ -2459,7 +2484,8 @@ def stage_ai_explorer():
                     "Do NOT generate or ask quiz questions in Chat Mode. If the user requests a quiz, first offer to teach the topic with a kite-related lesson, and then suggest switching to Quiz Mode for practice. "
                     "Teach math topics using kite examples and analogies, and make the conversation engaging and relevant to kites. "
                     "Answer questions about kite culture, history, symbolism, and general math concepts, but do NOT generate new math quiz questions. "
-                    "If asked for a quiz, always offer a lesson first, then recommend switching to Quiz Mode for quizzes."
+                    "If asked for a quiz, always offer a lesson first, then recommend switching to Quiz Mode for quizzes. "
+                    "Keep your responses concise and conversational, with a maximum of 80 words unless the user asks for a detailed explanation. Do not omit important information, but avoid long, blocky, or wordy passages."
                 )
             else:
                 st.session_state.system_prompt = (
@@ -2469,7 +2495,8 @@ def stage_ai_explorer():
                     "Do NOT generate or ask quiz questions in Chat Mode. If the user requests a quiz, first offer to teach the topic with a kite-related lesson, and then suggest switching to Quiz Mode for practice. "
                     "Teach math topics using kite examples and analogies, and make the conversation engaging and relevant to kites. "
                     "Answer questions about kite culture, history, symbolism, and general math concepts, but do NOT generate new math quiz questions. "
-                    "If asked for a quiz, always offer a lesson first, then recommend switching to Quiz Mode for quizzes."
+                    "If asked for a quiz, always offer a lesson first, then recommend switching to Quiz Mode for quizzes. "
+                    "Keep your responses concise and conversational, with a maximum of 80 words unless the user asks for a detailed explanation. Do not omit important information, but avoid long, blocky, or wordy passages."
                 )
             # Special case: Layangan Janggan kite detailed answer
             user_greetings = ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening"]
@@ -3008,6 +3035,13 @@ def angles_intro():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def angles_correct_answer():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .angles-correct-padding-top { height: 25px; }
+        </style>
+        <div class='angles-correct-padding-top'></div>
+    """, unsafe_allow_html=True)
     # Ultra-compact container
     st.markdown('<div class="angles-page">', unsafe_allow_html=True)
 
@@ -3066,6 +3100,13 @@ def angles_correct_answer():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def angles_wrong_answer1():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .angles-wrong-padding-top { height: 25px; }
+        </style>
+        <div class='angles-wrong-padding-top'></div>
+    """, unsafe_allow_html=True)
     # 🧼 Spacing and layout fixes
     st.markdown("""
     <style>
@@ -3178,6 +3219,13 @@ def angles_wrong_answer1():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def angles_wrong_answer2():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .angles-wrong2-padding-top { height: 25px; }
+        </style>
+        <div class='angles-wrong2-padding-top'></div>
+    """, unsafe_allow_html=True)
     # Add class for ultra-compact styling
     st.markdown('<div class="angles-page">', unsafe_allow_html=True)
     
@@ -3392,6 +3440,13 @@ To find the height, apply the formula:
     st.markdown('</div>', unsafe_allow_html=True)
 
 def trig_correct_answer():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .trig-correct-padding-top { height: 25px; }
+        </style>
+        <div class='trig-correct-padding-top'></div>
+    """, unsafe_allow_html=True)
     # ✅ Compact layout styling
     st.markdown("""
     <style>
@@ -3477,6 +3532,13 @@ You got it: **Height = 20 × 0.5 = 10 meters**.
     st.markdown('</div>', unsafe_allow_html=True)
 
 def trig_wrong_answer1():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .trig-wrong-padding-top { height: 25px; }
+        </style>
+        <div class='trig-wrong-padding-top'></div>
+    """, unsafe_allow_html=True)
     # 🧼 Compact layout styling
     st.markdown("""
     <style>
@@ -3572,6 +3634,13 @@ Take another look at the image:"""
     st.markdown('</div>', unsafe_allow_html=True)
 
 def trig_wrong_answer2():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .trig-wrong2-padding-top { height: 25px; }
+        </style>
+        <div class='trig-wrong2-padding-top'></div>
+    """, unsafe_allow_html=True)
     st.markdown('<div class="trig-page">', unsafe_allow_html=True)
     st.markdown(
         f"""❌ That's still not correct, {st.session_state.user_name}.
@@ -3777,6 +3846,13 @@ def peri_intro():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def peri_correct_answer():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .peri-correct-padding-top { height: 25px; }
+        </style>
+        <div class='peri-correct-padding-top'></div>
+    """, unsafe_allow_html=True)
     # ✅ Compact layout styling
     st.markdown("""
     <style>
@@ -3860,6 +3936,13 @@ You successfully calculated the **perimeter** of the kite's Vesica Piscis body.
     st.markdown('</div>', unsafe_allow_html=True)
 
 def peri_wrong_answer1():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .peri-wrong-padding-top { height: 25px; }
+        </style>
+        <div class='peri-wrong-padding-top'></div>
+    """, unsafe_allow_html=True)
     # ✅ Compact styling for scroll-free visibility
     st.markdown("""
     <style>
@@ -3952,6 +4035,13 @@ def peri_wrong_answer1():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def peri_wrong_answer2():
+    # Top padding for visual consistency
+    st.markdown("""
+        <style>
+            .peri-wrong2-padding-top { height: 25px; }
+        </style>
+        <div class='peri-wrong2-padding-top'></div>
+    """, unsafe_allow_html=True)
     st.markdown('<div class="peri-page">', unsafe_allow_html=True)
     st.markdown(
         f"""❌ That's okay, {st.session_state.user_name}. Don't worry! 🌱
