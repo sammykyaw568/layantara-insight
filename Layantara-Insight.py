@@ -2337,7 +2337,7 @@ def stage_ai_explorer():
             greeting_display = f"{time_greeting}, {user_name}! Let's chat with Layantara Insight."
             st.markdown(f"""
             <div class="welcome">
-                <div class="emoji">🪁</div>
+                <div class="emoji"><img src='https://imgur.com/F0IWprv.png' alt='Layantara Avatar' width='60' height='60' style='width:60px;height:60px;min-width:60px;min-height:60px;max-width:60px;max-height:60px;border-radius:50%;vertical-align:middle;box-shadow:0 2px 12px #00d4ff77;display:inline-block;object-fit:cover;image-rendering:auto;' loading='eager' decoding='async'/></div>
                 <div class="title">{greeting_display}</div>
                 <div class="desc">You can ask about kite mathematics, Indonesian culture, or aerodynamics—anytime!</div>
             </div>
