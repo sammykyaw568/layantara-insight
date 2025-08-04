@@ -2366,18 +2366,50 @@ def stage_ai_explorer():
                 time_greeting = "Good Evening"
             user_name = st.session_state.get('user_name', 'Friend')
             greeting_display = f"{time_greeting}, {user_name}! Let's chat with Layantara Insight."
+            # Center the avatar and greeting row vertically between mode buttons and suggestion buttons
             st.markdown(f"""
-            <div class="welcome">
-                <div class="emoji"><img src='https://imgur.com/F0IWprv.png' alt='Layantara Avatar' width='60' height='60' style='width:60px;height:60px;min-width:60px;min-height:60px;max-width:60px;max-height:60px;border-radius:50%;vertical-align:middle;box-shadow:0 2px 12px #00d4ff77;display:inline-block;object-fit:cover;image-rendering:auto;' loading='eager' decoding='async'/></div>
-                <div class="title">{greeting_display}</div>
-                <div class="desc">You can ask about kite mathematics, Indonesian culture, or aerodynamics—anytime!</div>
+            <div style='display:flex;align-items:center;justify-content:center;margin:2.2rem 0 0rem 0;'>
+                <div style='display:flex;align-items:center;gap:2.2rem;'>
+                    <div style='display:flex;align-items:center;justify-content:center;'>
+                        <img src='https://i.imgur.com/F0IWprv.png' alt='Layantara Avatar' width='130' height='110' class='bouncy-avatar' style='width:130px;height:110px;min-width:130px;min-height:110px;max-width:130px;max-height:110px;border-radius:50%;vertical-align:middle;box-shadow:0 0 0 0 #00d4ff77,0 4px 24px #00d4ff77;display:inline-block;margin: 0 -10px 0 10px;image-rendering:crisp-edges;-webkit-user-drag:none;-webkit-backface-visibility:hidden;' loading='eager' decoding='async'/>
+                    </div>
+                    <div>
+                        <div class="welcome" style='text-align:left;margin-top:0;'>
+                            <div class="title" style='font-size:1.25rem;font-weight:900;margin-bottom:0.3em;color:#fff;text-shadow:0 2px 18px #00d4ff77,0 1.5px 0 #00d4ff;'>
+                                {greeting_display}
+                            </div>
+                            <div class="desc" style='font-size:1.08rem;opacity:0.88;color:#b6c6e3;text-shadow:0 1.5px 0 #00d4ff33;'>
+                                You can ask about kite mathematics, Indonesian culture, or aerodynamics—anytime!
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+            """, unsafe_allow_html=True)
+            # Add CSS for bouncy animation and blue highlight
+            st.markdown("""
+            <style>
+            .bouncy-avatar {
+                animation: bounceAvatar 2.2s infinite cubic-bezier(.6,2,.6,1);
+                box-shadow:
+                  0 0 0 0 #00d4ff66,
+                  0 0 32px 8px #00d4ff33,
+                  0 4px 24px #00d4ff77;
+                transition: box-shadow 0.3s;
+            }
+            @keyframes bounceAvatar {
+                0%   { transform: translateY(0) scale(1); box-shadow:0 0 0 0 #00d4ff66,0 0 32px 8px #00d4ff33,0 4px 24px #00d4ff77; }
+                40%  { transform: translateY(-10px) scale(1.04); box-shadow:0 0 16px 8px #00d4ff99,0 0 32px 8px #00d4ff33,0 4px 24px #00d4ff77; }
+                60%  { transform: translateY(-7px) scale(1.03); box-shadow:0 0 12px 6px #00d4ff88,0 0 32px 8px #00d4ff33,0 4px 24px #00d4ff77; }
+                100% { transform: translateY(0) scale(1); box-shadow:0 0 0 0 #00d4ff66,0 0 32px 8px #00d4ff33,0 4px 24px #00d4ff77; }
+            }
+            </style>
             """, unsafe_allow_html=True)
 
         # Show suggestion buttons only before any message is sent
         if not st.session_state.ai_conversation_started and not st.session_state.chat_messages:
             # Move suggestion row upwards by reducing all margins
-            st.markdown('<style>.suggestion-row { margin: 0.2rem 0 1.7rem 0 !important; }</style>', unsafe_allow_html=True)
+            st.markdown('<style>.suggestion-row { margin: 0 0 0 !important; }</style>', unsafe_allow_html=True)
             st.markdown('<div class="suggestion-row">', unsafe_allow_html=True)
             suggestions = [
                 "Layangan Janggan kite",
