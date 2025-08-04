@@ -2371,7 +2371,7 @@ def stage_ai_explorer():
             <div style='display:flex;align-items:center;justify-content:center;margin:2.2rem 0 0rem 0;'>
                 <div style='display:flex;align-items:center;gap:2.2rem;'>
                     <div style='display:flex;align-items:center;justify-content:center;'>
-                        <img src='https://i.imgur.com/F0IWprv.png' alt='Layantara Avatar' width='130' height='110' class='bouncy-avatar' style='width:130px;height:110px;min-width:130px;min-height:110px;max-width:130px;max-height:110px;border-radius:50%;vertical-align:middle;box-shadow:0 0 0 0 #00d4ff77,0 4px 24px #00d4ff77;display:inline-block;margin: 0 -10px 0 10px;image-rendering:crisp-edges;-webkit-user-drag:none;-webkit-backface-visibility:hidden;' loading='eager' decoding='async'/>
+                        <img src='https://i.imgur.com/F0IWprv.png' alt='Layantara Avatar' width='130' height='110' class='bouncy-avatar' style='width:130px;height:110px;min-width:130px;min-height:110px;max-width:130px;max-height:110px;border-radius:50%;vertical-align:middle;box-shadow:0 0 0 0 #00d4ff77,0 4px 24px #00d4ff77;display:inline-block;margin: 26px -10px 0 10px;image-rendering:crisp-edges;-webkit-user-drag:none;-webkit-backface-visibility:hidden;' loading='eager' decoding='async'/>
                     </div>
                     <div>
                         <div class="welcome" style='text-align:left;margin-top:0;'>
@@ -2409,7 +2409,7 @@ def stage_ai_explorer():
         # Show suggestion buttons only before any message is sent
         if not st.session_state.ai_conversation_started and not st.session_state.chat_messages:
             # Move suggestion row upwards by reducing all margins
-            st.markdown('<style>.suggestion-row { margin: 0 0 0 !important; }</style>', unsafe_allow_html=True)
+            st.markdown('<style>.suggestion-row { margin: 0 0 2.3rem 0 !important; }</style>', unsafe_allow_html=True)
             st.markdown('<div class="suggestion-row">', unsafe_allow_html=True)
             suggestions = [
                 "Layangan Janggan kite",
