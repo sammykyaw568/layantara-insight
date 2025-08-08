@@ -871,7 +871,7 @@ def show_progress():
 # Helper: Google Gemini AI Integration (Free & Powerful!)
 
 
-def call_cerebras_api(prompt, user_name, api_key, conversation_history=None):
+def call_cerebras_api(prompt, user_name, api_key, conversation_history=None, *, temperature=0.7, max_tokens=1000):
     """Call Cerebras API - High limits and excellent models"""
     try:
         # Simple, natural system prompt
@@ -886,62 +886,161 @@ Use English and be friendly, but do not overcomplicate your reasoning or use unn
 
 User: {user_name if user_name else 'Student'}
 """
-        
+
         url = "https://api.cerebras.ai/v1/chat/completions"
-        
+
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         # Try best Cerebras models in order (based on test results)
         models = [
             "llama3.1-8b",   # ✅ Confirmed working
             "llama3.1-70b",  # Try larger model
-            "llama-3.3-70b"  # Latest model
+            "llama-3.3-70b",  # Latest model
         ]
-        
+
         for model in models:
             try:
                 # Build messages array with conversation history
                 messages = [{"role": "system", "content": system_prompt}]
-                
+
                 # Add conversation history if provided
                 if conversation_history:
                     messages.extend(conversation_history)
-                
+
                 # Add current user message
                 messages.append({"role": "user", "content": prompt})
-                
+
                 data = {
                     "model": model,
                     "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": 1000,
-                    "top_p": 0.9
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": 0.9,
                 }
-                
+
                 response = requests.post(url, headers=headers, json=data, timeout=20)
-                
+
                 if response.status_code == 200:
                     result = response.json()
-                    if 'choices' in result and result['choices']:
-                        content = result['choices'][0]['message']['content'].strip()
+                    if "choices" in result and result["choices"]:
+                        content = result["choices"][0]["message"]["content"].strip()
                         if content and len(content) > 10:
                             return content
-                            
-            except:
+            except Exception:
                 continue
-                
+
         # If all Cerebras models fail, fall back to Gemini
         # Use direct key from script, not .env
         if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
             return call_gemini_fallback(prompt, user_name, GEMINI_API_KEY)
-            
+
         return "I'm having trouble connecting to the AI service. Please check your API keys!"
-        
+
     except Exception as e:
         return f"AI service error: {str(e)[:100]}"
+
+def stream_cerebras_chat(prompt, user_name, api_key, placeholder, conversation_history=None, *, temperature=0.6, max_tokens=600):
+    """Attempt to stream a Cerebras chat completion into a Streamlit placeholder.
+    Falls back to non-streaming if streaming is unavailable.
+    Returns the full accumulated text or None on failure.
+    """
+    try:
+        system_prompt = f"""
+You are Layantara Insight, a friendly math tutor who helps students learn about kites, geometry, and Indonesian culture.
+
+Your main goal is to answer math questions and kite-related queries with clear, correct, and logical mathematical reasoning. Keep lessons concise and easy to scan.
+
+User: {user_name if user_name else 'Student'}
+"""
+
+        url = "https://api.cerebras.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        models = [
+            "llama3.1-8b",
+            "llama3.1-70b",
+            "llama-3.3-70b"
+        ]
+
+        # Immediate typing indicator so the user sees feedback right away
+        placeholder.markdown(
+            """
+            <div class="typing-indicator">
+                📘 Preparing a quick lesson… <span class="typewriter-cursor">▋</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        for model in models:
+            try:
+                messages = [{"role": "system", "content": system_prompt}]
+                if conversation_history:
+                    messages.extend(conversation_history)
+                messages.append({"role": "user", "content": prompt})
+
+                data = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": 0.9,
+                    "stream": True,
+                }
+
+                # Stream Server-Sent Events
+                resp = requests.post(url, headers=headers, json=data, timeout=60, stream=True)
+                if resp.status_code != 200:
+                    continue
+
+                full_text = ""
+                # Basic SSE loop compatible with OpenAI-like streaming
+                for raw_line in resp.iter_lines(decode_unicode=True):
+                    if not raw_line:
+                        continue
+                    line = raw_line.strip()
+                    if not line.startswith("data:"):
+                        continue
+                    payload = line[len("data:"):].strip()
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(payload)
+                    except Exception:
+                        continue
+
+                    # Try common delta shapes
+                    delta = ""
+                    try:
+                        delta = obj.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    except Exception:
+                        delta = ""
+                    if not delta:
+                        try:
+                            delta = obj.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        except Exception:
+                            delta = ""
+                    if not delta:
+                        continue
+
+                    full_text += delta
+                    # Render as the assistant chat bubble as it grows
+                    placeholder.markdown(
+                        f"<span class=\"chat-avatar\" style=\"margin-right:0.5em;\"><img src=\"https://i.imgur.com/cM9BMro.png\" alt=\"Layantara Avatar\" width=\"38\" height=\"38\" style=\"width:38px;height:38px;min-width:38px;min-height:38px;max-width:38px;max-height:38px;border-radius:50%;vertical-align:middle;box-shadow:0 2px 12px #00d4ff77;display:inline-block;object-fit:cover;image-rendering:auto;\"/></span><div class=\"chat-bubble assistant\"><b>📘 Lesson</b><br/><br/>{full_text}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                return full_text.strip() if full_text.strip() else None
+            except Exception:
+                continue
+        return None
+    except Exception:
+        return None
 
 def call_gemini_fallback(prompt, user_name, api_key, conversation_history=None):
     """Fallback to Gemini if Cerebras fails"""
@@ -2908,17 +3007,52 @@ def stage_ai_explorer():
         if teach_btn:
             lesson_prompt = (
                 f"Teach the topic '{topic}' using examples from kite shapes or flight design. "
-                "Explain like a tutor helping a student in higher education."
+                "Explain like a tutor helping a student in higher education. "
+                "Use clear, concise language and relate concepts to kites. "
+                "Do not ask quizzes to the student. You just need to explain the topic. "
+                "Keep it under 180–220 words with short sections and bullets where helpful."
             )
-            lesson = call_cerebras_api(lesson_prompt, st.session_state.user_name, os.getenv("CEREBRAS_API_KEY"))
-            # Add lesson as a chat bubble to quiz_messages, preserving markdown formatting
-            st.session_state.quiz_messages.append({
-                "role": "assistant",
-                "content": f"<b>📘 Lesson</b>\n\n{lesson}",
-                "type": "lesson"
-            })
-            st.session_state.quiz_feedback = ""
-            st.rerun()
+            # Show immediate placeholder and attempt to stream first
+            placeholder = st.empty()
+            streamed = stream_cerebras_chat(
+                lesson_prompt,
+                st.session_state.user_name,
+                CEREBRAS_API_KEY or os.getenv("CEREBRAS_API_KEY"),
+                placeholder,
+                temperature=0.6,
+                max_tokens=600,
+            )
+            if streamed and len(streamed) > 10:
+                # Cache to history and rerun for stable rendering
+                st.session_state.quiz_messages.append({
+                    "role": "assistant",
+                    "content": f"<b>📘 Lesson</b>\n\n{streamed}",
+                    "type": "lesson"
+                })
+                st.session_state.quiz_feedback = ""
+                st.rerun()
+            else:
+                # Graceful fallback: spinner + concise non-streaming call
+                with st.spinner("Preparing a quick lesson…"):
+                    lesson = call_cerebras_api(
+                        lesson_prompt,
+                        st.session_state.user_name,
+                        CEREBRAS_API_KEY or os.getenv("CEREBRAS_API_KEY"),
+                        temperature=0.6,
+                        max_tokens=600,
+                    )
+                # Typewriter display for perceived responsiveness
+                try:
+                    display_typewriter_effect(f"📘 Lesson\n\n{lesson}", placeholder, delay=0.01)
+                except Exception:
+                    placeholder.markdown(f"<div class=\"chat-bubble assistant\"><b>📘 Lesson</b><br/><br/>{lesson}</div>", unsafe_allow_html=True)
+                st.session_state.quiz_messages.append({
+                    "role": "assistant",
+                    "content": f"<b>📘 Lesson</b>\n\n{lesson}",
+                    "type": "lesson"
+                })
+                st.session_state.quiz_feedback = ""
+                st.rerun()
 
         # If last message is a lesson, show "Next Question" button to continue
         if st.session_state.quiz_messages and st.session_state.quiz_messages[-1]["type"] == "lesson":
