@@ -530,8 +530,8 @@ import time
 import streamlit.components.v1 as components
 
 # --- API KEYS (Directly in script; REMOVE .env dependency) ---
-CEREBRAS_API_KEY = "csk-8h46n2tpv5vc668k3yx93xnr6yx2fy5f9v9xdh6m2ydyhhf9"  # <-- Inserted actual Cerebras API key
-GEMINI_API_KEY = "AIzaSyDpjTz-ARkmm1YFUCpnDyDAqmHGE1Wzlfg"      # <-- Inserted actual Gemini API key
+CEREBRAS_API_KEY = "csk-rvyjv5rynnntkn2d9fenpr9ftrw2np8chn8e58j43tkff25d"  # <-- Updated Cerebras API key
+GEMINI_API_KEY = "AIzaSyCfFAHmfW9w1sA2kNk8lY3kXFQTVaZZETM"      # <-- Inserted actual Gemini API key
 
 def format_quiz_response(response_text):
     """Format AI responses to ensure quiz options appear on separate lines"""
@@ -901,18 +901,16 @@ User: {user_name if user_name else 'Student'}
             "llama-3.3-70b",  # Latest model
         ]
 
+        last_error = ""
         for model in models:
             try:
                 # Build messages array with conversation history
                 messages = [{"role": "system", "content": system_prompt}]
-
                 # Add conversation history if provided
                 if conversation_history:
                     messages.extend(conversation_history)
-
                 # Add current user message
                 messages.append({"role": "user", "content": prompt})
-
                 data = {
                     "model": model,
                     "messages": messages,
@@ -920,24 +918,33 @@ User: {user_name if user_name else 'Student'}
                     "max_tokens": max_tokens,
                     "top_p": 0.9,
                 }
-
                 response = requests.post(url, headers=headers, json=data, timeout=20)
-
                 if response.status_code == 200:
                     result = response.json()
                     if "choices" in result and result["choices"]:
                         content = result["choices"][0]["message"]["content"].strip()
-                        if content and len(content) > 10:
+                        # Relaxed length check: allow all non-empty responses
+                        if content:
                             return content
-            except Exception:
+                        else:
+                            last_error += f"Cerebras API (model {model}) returned empty content. Raw result: {result}\n"
+                    else:
+                        last_error += f"Cerebras API (model {model}) returned no choices. Raw result: {result}\n"
+                else:
+                    last_error += f"Cerebras API error (model {model}): {response.status_code} {response.text[:200]}\n"
+            except Exception as e:
+                last_error += f"Cerebras API exception (model {model}): {str(e)[:200]}\n"
                 continue
 
         # If all Cerebras models fail, fall back to Gemini
-        # Use direct key from script, not .env
         if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
-            return call_gemini_fallback(prompt, user_name, GEMINI_API_KEY)
+            gemini_response = call_gemini_fallback(prompt, user_name, GEMINI_API_KEY)
+            if gemini_response and "unavailable" not in gemini_response.lower():
+                return gemini_response
+            else:
+                last_error += f"Gemini fallback error: {gemini_response}\n"
 
-        return "I'm having trouble connecting to the AI service. Please check your API keys!"
+        return f"All AI services failed. Details: {last_error if last_error else 'No error details.'}"
 
     except Exception as e:
         return f"AI service error: {str(e)[:100]}"
@@ -2000,7 +2007,7 @@ def stage_ai_chat():
                     "If asked for a quiz, politely say quizzes are only available in the Quiz mode."
                 )
                 full_prompt = prompt + "\nUser: " + suggestion
-                response = call_cerebras_api(full_prompt, st.session_state.user_name, os.getenv("CEREBRAS_API_KEY"))
+                response = call_cerebras_api(full_prompt, st.session_state.user_name, CEREBRAS_API_KEY)
                 st.session_state.chat_history.append({"role": "assistant", "content": response})
                 st.experimental_rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -2028,7 +2035,7 @@ def stage_ai_chat():
                 "If asked for a quiz, politely say quizzes are only available in the Quiz mode."
             )
             full_prompt = prompt + "\nUser: " + user_input.strip()
-            response = call_cerebras_api(full_prompt, st.session_state.user_name, os.getenv("CEREBRAS_API_KEY"))
+            response = call_cerebras_api(full_prompt, st.session_state.user_name, CEREBRAS_API_KEY)
             st.session_state.chat_history.append({"role": "assistant", "content": response})
 
     for msg in st.session_state.chat_history:
@@ -2659,7 +2666,7 @@ def stage_ai_explorer():
                 response = call_cerebras_api(
                     st.session_state.system_prompt + "\nUser: " + prompt,
                     st.session_state.user_name,
-                    os.getenv("CEREBRAS_API_KEY"),
+                    CEREBRAS_API_KEY,
                     conversation
                 )
             if response and "Error:" not in response:
@@ -3017,7 +3024,7 @@ def stage_ai_explorer():
             streamed = stream_cerebras_chat(
                 lesson_prompt,
                 st.session_state.user_name,
-                CEREBRAS_API_KEY or os.getenv("CEREBRAS_API_KEY"),
+                CEREBRAS_API_KEY,
                 placeholder,
                 temperature=0.6,
                 max_tokens=600,
@@ -3037,7 +3044,7 @@ def stage_ai_explorer():
                     lesson = call_cerebras_api(
                         lesson_prompt,
                         st.session_state.user_name,
-                        CEREBRAS_API_KEY or os.getenv("CEREBRAS_API_KEY"),
+                        CEREBRAS_API_KEY,
                         temperature=0.6,
                         max_tokens=600,
                     )
